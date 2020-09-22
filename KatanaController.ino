@@ -390,17 +390,24 @@ void refreshScreen() {
     else
       lcd.print("    ");
   
-    lcd.setCursor(0,1);  
+    lcd.setCursor(0,1);
+    if(controlMode == presetSelect)
+      lcd.print("> ");
+    else
+      lcd.print("  ");
     lcd.print(toString(preset));
-    lcd.print("    ");
+    lcd.print("  ");
     lcd.print(toString(amp_type));
     
-    lcd.setCursor(0,2);  
-    lcd.print("BST MOD  FX  DEL REV");
+    lcd.setCursor(0,2);
+    lcd.print(" BST MOD FX DEL REV ");
 
     lcd.setCursor(0,3);
 
-    lcd.print(" ");
+    if(controlMode == effectsOnOff)
+      lcd.print("> ");
+    else
+      lcd.print("  ");
     if(booster_en == OFF)
       lcd.print(" ");
     else
@@ -412,13 +419,13 @@ void refreshScreen() {
     else
       lcd.print(toString(mod_gry));
   
-    lcd.print("   ");
+    lcd.print("  ");
     if(fx_en == OFF)
       lcd.print(" ");
     else
       lcd.print(toString(fx_gry));
   
-    lcd.print("    ");
+    lcd.print("   ");
     if(delay_en == OFF)
       lcd.print(" ");
     else
@@ -430,7 +437,7 @@ void refreshScreen() {
     else
       lcd.print(toString(reverb_gry));
       
-    lcd.print(" ");
+    lcd.print("  ");
   }
 }
 
@@ -598,6 +605,7 @@ void loop() {
         controlMode = effectsOnOff;      
         println("controlMode : effectsOnOff");
       }
+      refreshScreen();
     }
   }
 }
