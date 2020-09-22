@@ -212,6 +212,17 @@ void handleSysEx(const byte* sysExData, uint16_t sysExSize, bool complete) {
        preset = (preset_t)sysExData[13];
        print("PRESET : ");
        println(preset);
+
+       if(preset == Pannel)
+         expectMidiPackets(11);
+       else
+         expectMidiPackets(6);
+            
+       readEffectStatus();
+      
+       vol_mute = OFF;
+       madeEdits = 0;
+       refreshScreen();
        break;
      
      case PANNEL_NAME:
@@ -253,9 +264,9 @@ uint8_t expectMidiPackets(uint8_t expectedPackets) {
   if (expectedPackets == 0)
     return 0;
     
-  print("Expects ");
-  print(expectedPackets);
-  println(" MIDI packets");
+  print_("Expects ");
+  print_(expectedPackets);
+  println_(" MIDI packets");
 
   unsigned long timeout = millis()+1000;
   
@@ -267,9 +278,9 @@ uint8_t expectMidiPackets(uint8_t expectedPackets) {
   }
 
   if (expectedPackets == 0)
-    println("All expected packets have now been received");
+    println_("All expected packets have now been received");
   else
-    println("Not all expected packets have been received, timeout");
+    println_("Not all expected packets have been received, timeout");
     
   return expectedPackets;
 }
@@ -277,17 +288,7 @@ uint8_t expectMidiPackets(uint8_t expectedPackets) {
 void recallPreset(uint8_t preset) {
   byte data[2] = {0};
   data[1] = preset;
-
-  if(preset == Pannel)
-    send_sysex(PRESET, data, 2, SYSEX_WRITE, 12);
-  else
-    send_sysex(PRESET, data, 2, SYSEX_WRITE, 7);
-  
-  vol_mute = OFF;
-  
-  readEffectStatus();
-  madeEdits = 0;
-  refreshScreen();
+  send_sysex(PRESET, data, 2, SYSEX_WRITE, 1);
 }
 
 void readEffectStatus() {
@@ -313,17 +314,15 @@ void readEffectStatus() {
 void readFullStatus() {
   byte data[4] = {0};
 
-  readEffectStatus();
-
-  data[3] = 2;
-  send_sysex(PRESET, data, 4, SYSEX_READ, 1);
-
   data[3] = 16;
   send_sysex(PANNEL_NAME, data, 4, SYSEX_READ, 1);
   send_sysex(CH1_NAME, data, 4, SYSEX_READ, 1);
   send_sysex(CH2_NAME, data, 4, SYSEX_READ, 1);
   send_sysex(CH3_NAME, data, 4, SYSEX_READ, 1);
   send_sysex(CH4_NAME, data, 4, SYSEX_READ, 1);
+
+  data[3] = 2;
+  send_sysex(PRESET, data, 4, SYSEX_READ, 1);
   
   madeEdits = 0;
 }
@@ -339,79 +338,89 @@ void lcdPrintGRY(enum GRY_t s) {
 
 void refreshScreen() {
   lcd.setCursor(0,0);
+
+  if (!midi1) {
+    lcd.print("Waiting for Katana  ");
+    lcd.setCursor(0,1);
+    lcd.print("to connect          ");
+    lcd.setCursor(0,2);
+    lcd.print("                    ");
+    lcd.setCursor(0,3);
+    lcd.print("                    ");
+  } else {
+    if(madeEdits)
+      lcd.print("*");
+    else
+      lcd.print(" ");
   
-  if(madeEdits)
-    lcd.print("*");
-  else
-    lcd.print(" ");
-
-  if(preset == Pannel)
-    lcd.print(pannel_name);
-  else if(preset == Ch1)
-    lcd.print(ch1_name);
-  else if(preset == Ch2)
-    lcd.print(ch2_name);
-  else if(preset == Ch3)
-    lcd.print(ch3_name);
-  else if(preset == Ch4)
-    lcd.print(ch4_name);
+    if(preset == Pannel)
+      lcd.print(pannel_name);
+    else if(preset == Ch1)
+      lcd.print(ch1_name);
+    else if(preset == Ch2)
+      lcd.print(ch2_name);
+    else if(preset == Ch3)
+      lcd.print(ch3_name);
+    else if(preset == Ch4)
+      lcd.print(ch4_name);
+    
+    if(vol_mute == ON)
+      lcd.print("MUTE");
+    else
+      lcd.print("    ");
   
-  if(vol_mute == ON)
-    lcd.print("MUTE");
-  else
-    lcd.print("    ");
-
-  lcd.setCursor(0,1);
-
-  if(preset == Pannel)
-    lcd.print("Pannel    ");
-  else if(preset == Ch1)
-    lcd.print("A-Ch1     ");
-  else if(preset == Ch2)
-    lcd.print("A-Ch2     ");
-  else if(preset == Ch3)
-    lcd.print("B-Ch1     ");
-  else if(preset == Ch4)
-    lcd.print("B-Ch2     ");
-
-  lcd.print("BST:");
-  if(booster_en == OFF)
-    lcd.print("OFF   ");
-  else
-    lcdPrintGRY(booster_gry);
-
-  lcd.setCursor(0,2);
-
-  lcd.print("MOD:");
-  if(mod_en == OFF)
-    lcd.print("OFF   ");
-  else
-    lcdPrintGRY(mod_gry);
-
-  lcd.print("FX :");
-  if(fx_en == OFF)
-    lcd.print("OFF   ");
-  else
-    lcdPrintGRY(fx_gry);
-
-  lcd.setCursor(0,3);
-
-  lcd.print("DEL:");
-  if(delay_en == OFF)
-    lcd.print("OFF   ");
-  else
-    lcdPrintGRY(delay_gry);
-
-  lcd.print("REV:");
-  if(reverb_en == OFF)
-    lcd.print("OFF   ");
-  else
-    lcdPrintGRY(reverb_gry);
+    lcd.setCursor(0,1);
   
+    if(preset == Pannel)
+      lcd.print("Pannel    ");
+    else if(preset == Ch1)
+      lcd.print("A-Ch1     ");
+    else if(preset == Ch2)
+      lcd.print("A-Ch2     ");
+    else if(preset == Ch3)
+      lcd.print("B-Ch1     ");
+    else if(preset == Ch4)
+      lcd.print("B-Ch2     ");
+  
+    lcd.print("BST:");
+    if(booster_en == OFF)
+      lcd.print("OFF   ");
+    else
+      lcdPrintGRY(booster_gry);
+  
+    lcd.setCursor(0,2);
+  
+    lcd.print("MOD:");
+    if(mod_en == OFF)
+      lcd.print("OFF   ");
+    else
+      lcdPrintGRY(mod_gry);
+  
+    lcd.print("FX :");
+    if(fx_en == OFF)
+      lcd.print("OFF   ");
+    else
+      lcdPrintGRY(fx_gry);
+  
+    lcd.setCursor(0,3);
+  
+    lcd.print("DEL:");
+    if(delay_en == OFF)
+      lcd.print("OFF   ");
+    else
+      lcdPrintGRY(delay_gry);
+  
+    lcd.print("REV:");
+    if(reverb_en == OFF)
+      lcd.print("OFF   ");
+    else
+      lcdPrintGRY(reverb_gry);
+  }
 }
 
 void initKatana() {
   println("Waiting for Katana to connect");
+  refreshScreen();
   while(!midi1);
 
   midi1.setHandleSysEx(handleSysEx);
