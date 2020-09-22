@@ -35,8 +35,8 @@ uint8_t bp_menu_event = 0;
 uint8_t bp_mute_event = 0;
 
 
-byte checksum(byte const *data, byte dataLength) {
-    byte sum = 0, i;
+uint8_t checksum(const uint8_t *data, uint8_t dataLength) {
+    uint8_t sum = 0, i;
 
     for (i = 8; i < 12 + dataLength; i++) {
         sum = (sum + data[i]) & 0x7F;
@@ -45,16 +45,16 @@ byte checksum(byte const *data, byte dataLength) {
     return (128 - sum) & 0x7F;
 }
 
-void send_sysex(const unsigned long address, byte *data, byte dataLength, byte action, byte nbPacketExpectedInReturn = 0) {
-    byte sysex[14 + dataLength] = {0};
+void send_sysex(const unsigned long address, uint8_t *data, uint8_t dataLength, uint8_t action, uint8_t nbPacketExpectedInReturn = 0) {
+    uint8_t sysex[14 + dataLength] = {0};
 
     sysex[0] = SYSEX_START;
     memcpy(sysex + 1, SYSEX_HEADER, 7);
     sysex[7] = action;
-    sysex[8] = (byte)(address >> 24);
-    sysex[9] = (byte)(address >> 16);
-    sysex[10] = (byte)(address >> 8);
-    sysex[11] = (byte)(address);
+    sysex[8] = (uint8_t)(address >> 24);
+    sysex[9] = (uint8_t)(address >> 16);
+    sysex[10] = (uint8_t)(address >> 8);
+    sysex[11] = (uint8_t)(address);
     memcpy(sysex + 12, data, dataLength);
     sysex[12 + dataLength] = checksum(sysex, dataLength);
     sysex[13 + dataLength] = SYSEX_END;
@@ -65,13 +65,14 @@ void send_sysex(const unsigned long address, byte *data, byte dataLength, byte a
     } while(expectMidiPackets(nbPacketExpectedInReturn) != 0);
 }
 
-void setEditorMode(bool active = true) {
-    byte data[1] = {(active) ? (byte) 0x01 : (byte) 0x00};
+void setEditorMode(uint8_t active) {
+    uint8_t data[1];
+    data[0] = (active) ? 1 : 0;
     send_sysex(P_EDIT, data, 1, SYSEX_WRITE);    
 }
 
 void isr_bp(uint8_t bp) {
-  static unsigned long last_event[NB_BP] = {0};
+  static uint32_t last_event[NB_BP] = {0};
 
   if (millis() - last_event[bp] > BP_DEBOUNCE_MS) {
     bp_event[bp] = 1;
@@ -100,7 +101,7 @@ void isr_bp5() {
 }
 
 void isr_bp_menu() {
-  static unsigned long last_event = 0;
+  static uint32_t last_event = 0;
 
   if (millis() - last_event > BP_DEBOUNCE_MS) {
     bp_menu_event = 1;
@@ -109,7 +110,7 @@ void isr_bp_menu() {
 }
 
 void isr_bp_mute() {
-  static unsigned long last_event = 0;
+  static uint32_t last_event = 0;
 
   if (millis() - last_event > BP_DEBOUNCE_MS) {
     bp_mute_event = 1;
@@ -165,10 +166,10 @@ const char * toString(amp_type_t s) {
     return NULL;
 }
 
-void handleSysEx(const byte* sysExData, uint16_t sysExSize, bool complete) {
+void handleSysEx(const uint8_t* sysExData, uint16_t sysExSize, bool complete) {
   //simple test to see if the complete message is available
   if(complete){
-    unsigned long addr = sysExData[8]<<24 | sysExData[9]<<16 | sysExData[10]<<8 | sysExData[11];
+    uint32_t addr = sysExData[8]<<24 | sysExData[9]<<16 | sysExData[10]<<8 | sysExData[11];
 
     print_("Received ");
     print_(sysExSize);
@@ -310,7 +311,7 @@ uint8_t expectMidiPackets(uint8_t expectedPackets) {
   print_(expectedPackets);
   println_(" MIDI packets");
 
-  unsigned long timeout = millis()+1000;
+  uint32_t timeout = millis()+1000;
   
   while(expectedPackets != 0 && millis() < timeout) {
     myusb.Task();
@@ -328,13 +329,13 @@ uint8_t expectMidiPackets(uint8_t expectedPackets) {
 }
 
 void recallPreset(uint8_t preset) {
-  byte data[2] = {0};
+  uint8_t data[2] = {0};
   data[1] = preset;
   send_sysex(PRESET, data, 2, SYSEX_WRITE, 1);
 }
 
 void readEffectStatus() {
-  byte data[4] = {0};
+  uint8_t data[4] = {0};
   
   data[3] = 1;
   send_sysex(EN_BOOSTER, data, 4, SYSEX_READ, 1);
@@ -356,7 +357,7 @@ void readEffectStatus() {
 }
 
 void readFullStatus() {
-  byte data[4] = {0};
+  uint8_t data[4] = {0};
 
   data[3] = 16;
   send_sysex(PANNEL_NAME, data, 4, SYSEX_READ, 1);
@@ -485,9 +486,9 @@ void initKatana() {
   print(midi1.idProduct(), HEX);
   println(")");
   
-  setEditorMode(true);
-  setEditorMode(true);
-  setEditorMode(true);
+  setEditorMode(1);
+  setEditorMode(1);
+  setEditorMode(1);
 
   readFullStatus();
   refreshScreen();
@@ -524,16 +525,16 @@ void setup() {
 }
 
 void muteToggle() {
-  byte data[1];
+  uint8_t data[1];
   uint8_t madeEditsBak = madeEdits;
   if (vol_mute == ON) {
     vol_mute = OFF;
-    data[0] = {(byte)vol_level};
+    data[0] = {vol_level};
     send_sysex(VOLUME, data, 1, SYSEX_WRITE, 1);
     println("Unmutted");
   } else {
     vol_mute = ON;
-    data[0] = {(byte)0};
+    data[0] = {0};
     send_sysex(VOLUME, data, 1, SYSEX_WRITE, 1);
     println("Muted");
   }
@@ -567,26 +568,26 @@ void presetSelectEvent(uint8_t bp) {
 }
 
 void effectsOnOffEvent(uint8_t bp) {
-  byte data[1];
+  uint8_t data[1];
   if (bp == 0) {
     booster_en = (booster_en==ON) ? OFF : ON;
-    data[0] = (booster_en==ON) ? (byte)1 : (byte)0;
+    data[0] = (booster_en==ON) ? 1 : 0;
     send_sysex(EN_BOOSTER, data, 1, SYSEX_WRITE, 1);
   } else if (bp == 1) {
     mod_en = (mod_en==ON) ? OFF : ON;
-    data[0] = (mod_en==ON) ? (byte)1 : (byte)0;
+    data[0] = (mod_en==ON) ? 1 : 0;
     send_sysex(EN_MOD, data, 1, SYSEX_WRITE, 1);
   } else if (bp == 2) {
     fx_en = (fx_en==ON) ? OFF : ON;
-    data[0] = (fx_en==ON) ? (byte)1 : (byte)0;
+    data[0] = (fx_en==ON) ? 1 : 0;
     send_sysex(EN_FX, data, 1, SYSEX_WRITE, 1);
   } else if (bp == 3) {
     delay_en = (delay_en==ON) ? OFF : ON;
-    data[0] = (delay_en==ON) ? (byte)1 : (byte)0;
+    data[0] = (delay_en==ON) ? 1 : 0;
     send_sysex(EN_DELAY, data, 1, SYSEX_WRITE, 1);
   } else if (bp == 4) {
     reverb_en = (reverb_en==ON) ? OFF : ON;
-    data[0] = (reverb_en==ON) ? (byte)1 : (byte)0;
+    data[0] = (reverb_en==ON) ? 1 : 0;
     send_sysex(EN_REVERB, data, 1, SYSEX_WRITE, 1);
   }
   madeEdits = 1;
