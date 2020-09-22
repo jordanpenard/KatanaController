@@ -1,4 +1,4 @@
-#define DEBUG
+//#define DEBUG
 //#define DEBUG_VERBOSE
 
 #include <Wire.h> 
@@ -9,23 +9,24 @@
 
 LiquidCrystal_I2C lcd(0x27,20,4);  // set the LCD address to 0x27 for a 16 chars and 2 line display
 
-bool bp_event[6] = {false};
+uint8_t bp_event[6] = {0};
 
 USBHost myusb;
 USBHub hub1(myusb);
 USBHub hub2(myusb);
 MIDIDevice_BigBuffer midi1(myusb);
 
-typedef enum {effectsOnOff, presetSelect, menu3} controlMode_t;
-typedef enum {GREEN=0, RED=1, YELLOW=2} GRY_t;
-typedef enum {ON=1, OFF=0} on_off_t;
+typedef enum {effectsOnOff = 0, presetSelect = 1, menu3 = 2} controlMode_t;
+typedef enum {GREEN = 0, RED = 1, YELLOW = 2} GRY_t;
+typedef enum {ON = 1, OFF = 0} on_off_t;
 typedef enum {Pannel = 0, Ch1 = 1, Ch2 = 2, Ch3 = 5, Ch4 = 6} preset_t;
-typedef enum {Acoustic, Clean, Crunch, Lead, Brown} amp_t;
+typedef enum {Acoustic = 0, Clean = 1, Crunch = 2, Lead = 3, Brown = 4} amp_type_t;
 
 controlMode_t controlMode = effectsOnOff;
 GRY_t booster_gry, mod_gry, fx_gry, delay_gry, reverb_gry;
 on_off_t booster_en, mod_en, fx_en, delay_en, reverb_en;
 preset_t preset;
+amp_type_t amp_type;
 uint8_t vol_level;
 char pannel_name[16], ch1_name[16], ch2_name[16], ch3_name[16], ch4_name[16] = {0};
 on_off_t vol_mute = OFF;
@@ -71,64 +72,81 @@ void isr_bp(uint8_t bp) {
   static unsigned long last_event[6] = {0};
 
   if (millis() - last_event[bp] > 1000) {
-    bp_event[bp-1] = true;
+    bp_event[bp] = 1;
     last_event[bp] = millis();
   }
 }
 
 void isr_bp1() {
-  isr_bp(1);
+  isr_bp(0);
 }
 
 void isr_bp2() {
-  isr_bp(2);
+  isr_bp(1);
 }
 
 void isr_bp3() {
-  isr_bp(3);
+  isr_bp(2);
 }
 
 void isr_bp4() {
-  isr_bp(4);
+  isr_bp(3);
 }
 
 void isr_bp5() {
-  isr_bp(5);
+  isr_bp(4);
 }
 
 void isr_bp6() {
-  isr_bp(6);
+  isr_bp(5);
 }
 
-void println(on_off_t s) { 
+const char * toString(on_off_t s) { 
   if(s == ON)
-    println("ON");
+    return "ON";
   else
-    println("OFF");
+    return "OFF";
 }
 
-void println(GRY_t s, int b = DEC) { 
+const char * toString(GRY_t s) { 
   if (s == GREEN)
-    println("GREEN");
+    return "G";
   else if (s == RED)
-    println("RED");
+    return "R";
+  else if (s == YELLOW)
+    return "Y";
   else
-    println("YELLOW");
+    return NULL;
 }
 
-void println(preset_t s, int b = DEC) { 
-  if (s == Pannel)
-    println("Pannel");
-  else if (s == Ch1)
-    println("Ch1");
-  else if (s == Ch2)
-    println("Ch2");
-  else if (s == Ch3)
-    println("Ch3");
-  else if (s == Ch4)
-    println("Ch4");
+const char * toString(preset_t preset) {
+  if(preset == Pannel)
+    return "Pannel";
+  else if(preset == Ch1)
+    return "A-Ch1 ";
+  else if(preset == Ch2)
+    return "A-Ch2 ";
+  else if(preset == Ch3)
+    return "B-Ch1 ";
+  else if(preset == Ch4)
+    return "B-Ch2 ";
   else
-    println((int)s, DEC);
+    return NULL;
+}
+
+const char * toString(amp_type_t s) { 
+  if (s == Acoustic)
+    return "Acoustic";
+  else if (s == Clean)
+    return "Clean   ";
+  else if (s == Crunch)
+    return "Crunch  ";
+  else if (s == Lead)
+    return "Lead    ";
+  else if (s == Brown)
+    return "Brown   ";
+  else
+    return NULL;
 }
 
 void handleSysEx(const byte* sysExData, uint16_t sysExSize, bool complete) {
@@ -149,74 +167,80 @@ void handleSysEx(const byte* sysExData, uint16_t sysExSize, bool complete) {
     }
     println_("");
 
-    madeEdits = 1;
+    if(preset != Pannel)
+      madeEdits = 1;
     
     switch(addr){
      case EN_BOOSTER:
+     case R_BOOSTER:
        booster_en = sysExData[12] ? ON : OFF;
        print("EN_BOOSTER : ");
-       println(booster_en);
+       println(toString(booster_en));
        break;
      case EN_MOD:
+     case R_MOD:
        mod_en = sysExData[12] ? ON : OFF;
        print("EN_MOD : ");
-       println(mod_en);
+       println(toString(mod_en));
        break;
      case EN_FX:
+     case R_FX:
        fx_en = sysExData[12] ? ON : OFF;
        print("EN_FX : ");
-       println(fx_en);
+       println(toString(fx_en));
        break;
      case EN_DELAY:
+     case R_DELAY:
        delay_en = sysExData[12] ? ON : OFF;
        print("EN_DELAY : ");
-       println(delay_en);
+       println(toString(delay_en));
        break;
      case EN_REVERB:
+     case R_REVERB:
        reverb_en = sysExData[12] ? ON : OFF;
        print("EN_REVERB : ");
-       println(reverb_en);
+       println(toString(reverb_en));
        break;
        
      case GRY_BOOSTER:
        booster_gry = (GRY_t)sysExData[12];
        print("GRY_BOOSTER : ");
-       println(booster_gry);
+       println(toString(booster_gry));
        break;
      case GRY_MOD:
        mod_gry = (GRY_t)sysExData[12];
        print("GRY_MOD : ");
-       println(mod_gry);
+       println(toString(mod_gry));
        break;
      case GRY_FX:
        fx_gry = (GRY_t)sysExData[12];
        print("GRY_FX : ");
-       println(fx_gry);
+       println(toString(fx_gry));
        break;
      case GRY_DELAY:
        delay_gry = (GRY_t)sysExData[12];
        print("GRY_DELAY : ");
-       println(delay_gry);
+       println(toString(delay_gry));
        break;
      case GRY_REVERB:
        reverb_gry = (GRY_t)sysExData[12];
        print("GRY_REVERB : ");
-       println(reverb_gry);
+       println(toString(reverb_gry));
        break;
        
      case PRESET:
        preset = (preset_t)sysExData[13];
        print("PRESET : ");
-       println(preset);
+       println(toString(preset));
 
        if(preset == Pannel)
          expectMidiPackets(11);
        else
          expectMidiPackets(6);
             
+       vol_mute = OFF;
        readEffectStatus();
       
-       vol_mute = OFF;
        madeEdits = 0;
        refreshScreen();
        break;
@@ -251,6 +275,12 @@ void handleSysEx(const byte* sysExData, uint16_t sysExSize, bool complete) {
        vol_level = sysExData[12];
        print("Volume level : ");
        println(vol_level, HEX);
+       break;
+
+     case AMP_TYPE:
+       amp_type = (amp_type_t)sysExData[12];
+       print("Amp type : ");
+       println(toString(amp_type));
        break;
     }
   }   
@@ -303,6 +333,8 @@ void readEffectStatus() {
   send_sysex(GRY_DELAY, data, 4, SYSEX_READ, 1);
   send_sysex(GRY_REVERB, data, 4, SYSEX_READ, 1);
 
+  send_sysex(AMP_TYPE, data, 4, SYSEX_READ, 1);
+
   if(vol_mute == OFF)
     send_sysex(VOLUME, data, 4, SYSEX_READ, 1);  
 }
@@ -321,15 +353,6 @@ void readFullStatus() {
   send_sysex(PRESET, data, 4, SYSEX_READ, 1);
   
   madeEdits = 0;
-}
-
-void lcdPrintGRY(GRY_t s) { 
-  if (s == GREEN)
-    lcd.print("G");
-  else if (s == RED)
-    lcd.print("R");
-  else
-    lcd.print("Y");
 }
 
 void refreshScreen() {
@@ -367,21 +390,10 @@ void refreshScreen() {
     else
       lcd.print("    ");
   
-    lcd.setCursor(0,1);
-  
-    if(preset == Pannel)
-      lcd.print("Pannel    ");
-    else if(preset == Ch1)
-      lcd.print("A-Ch1     ");
-    else if(preset == Ch2)
-      lcd.print("A-Ch2     ");
-    else if(preset == Ch3)
-      lcd.print("B-Ch1     ");
-    else if(preset == Ch4)
-      lcd.print("B-Ch2     ");
-
-    // Amp type
-    lcd.print("          ");
+    lcd.setCursor(0,1);  
+    lcd.print(toString(preset));
+    lcd.print("    ");
+    lcd.print(toString(amp_type));
     
     lcd.setCursor(0,2);  
     lcd.print("BST MOD  FX  DEL REV");
@@ -392,31 +404,31 @@ void refreshScreen() {
     if(booster_en == OFF)
       lcd.print(" ");
     else
-      lcdPrintGRY(booster_gry);
+      lcd.print(toString(booster_gry));
 
     lcd.print("   ");
     if(mod_en == OFF)
       lcd.print(" ");
     else
-      lcdPrintGRY(mod_gry);
+      lcd.print(toString(mod_gry));
   
     lcd.print("   ");
     if(fx_en == OFF)
       lcd.print(" ");
     else
-      lcdPrintGRY(fx_gry);
+      lcd.print(toString(fx_gry));
   
     lcd.print("    ");
     if(delay_en == OFF)
       lcd.print(" ");
     else
-      lcdPrintGRY(delay_gry);
+      lcd.print(toString(delay_gry));
   
     lcd.print("   ");
     if(reverb_en == OFF)
       lcd.print(" ");
     else
-      lcdPrintGRY(reverb_gry);
+      lcd.print(toString(reverb_gry));
       
     lcd.print(" ");
   }
@@ -482,112 +494,99 @@ void setup() {
   myusb.begin();
 }
 
+void menu3Event(uint8_t bp) {
+  byte data[1];
+  if (bp == 0) {
+    uint8_t madeEditsBak = madeEdits;
+    if (vol_mute == ON) {
+      vol_mute = OFF;
+      data[0] = {(byte)vol_level};
+      send_sysex(VOLUME, data, 1, SYSEX_WRITE, 1);
+      println("Unmutted");
+    } else {
+      vol_mute = ON;
+      data[0] = {(byte)0};
+      send_sysex(VOLUME, data, 1, SYSEX_WRITE, 1);
+      println("Muted");
+    }
+    madeEdits = madeEditsBak;
+    refreshScreen();
+  }
+}
+
+void presetSelectEvent(uint8_t bp) {
+  if (bp == 0)
+    preset = Pannel;
+  else if (bp == 1)
+    preset = Ch1;
+  else if (bp == 2)
+    preset = Ch2;
+  else if (bp == 3)
+    preset = Ch3;
+  else if (bp == 4)
+    preset = Ch4;
+          
+  recallPreset(preset);
+}
+
+void effectsOnOffEvent(uint8_t bp) {
+  byte data[1];
+  if (bp == 0) {
+    booster_en = (booster_en==ON) ? OFF : ON;
+    data[0] = {(booster_en==ON) ? (byte)1 : (byte)0};
+    send_sysex(EN_BOOSTER, data, 1, SYSEX_WRITE, 1);
+  } else if (bp == 1) {
+    mod_en = (mod_en==ON) ? OFF : ON;
+    data[0] = {(mod_en==ON) ? (byte)1 : (byte)0};
+    send_sysex(EN_MOD, data, 1, SYSEX_WRITE, 1);
+  } else if (bp == 2) {
+    fx_en = (fx_en==ON) ? OFF : ON;
+    data[0] = {(fx_en==ON) ? (byte)1 : (byte)0};
+    send_sysex(EN_FX, data, 1, SYSEX_WRITE, 1);
+  } else if (bp == 3) {
+    delay_en = (delay_en==ON) ? OFF : ON;
+    data[0] = {(delay_en==ON) ? (byte)1 : (byte)0};
+    send_sysex(EN_DELAY, data, 1, SYSEX_WRITE, 1);
+  } else if (bp == 4) {
+    reverb_en = (reverb_en==ON) ? OFF : ON;
+    data[0] = {(reverb_en==ON) ? (byte)1 : (byte)0};
+    send_sysex(EN_REVERB, data, 1, SYSEX_WRITE, 1);
+  }
+  madeEdits = 1;
+  refreshScreen();
+}
+
 void loop() {
   
   if (!midi1)
     initKatana();
-    
+
   myusb.Task();
   if(midi1.read()) {
     refreshScreen();
 
   } else {
-  
-    if (bp_event[0]) {
-      println_("BP1");
-      bp_event[0] = false;
-  
-      if (controlMode == effectsOnOff) {
-        booster_en = (booster_en==ON) ? OFF : ON;
-        byte data[1] = {(booster_en==ON) ? (byte)1 : (byte)0};
-        send_sysex(EN_BOOSTER, data, 1, SYSEX_WRITE);
-        print("EN_BOOSTER : ");
-        println(booster_en);
-      } else if (controlMode == presetSelect) {
-        preset = Pannel;
-        recallPreset(preset);
-      } else if (controlMode == menu3) {
-        if (vol_mute == ON) {
-          vol_mute = OFF;
-          byte data[1] = {(byte)vol_level};
-          send_sysex(VOLUME, data, 1, SYSEX_WRITE);
-          println("Unmutted");
-        } else {
-          vol_mute = ON;
-          byte data[1] = {(byte)0};
-          send_sysex(VOLUME, data, 1, SYSEX_WRITE);
-          println("Muted");
-        }
-      }
+
+    for (uint8_t i = 0; i < 5; i++) {
+      if (bp_event[i]) {
+        print_("BP");
+        println_(i+1);
+        bp_event[i] = 0;
+
+        if (controlMode == effectsOnOff)
+          effectsOnOffEvent(i);
+        
+        else if (controlMode == presetSelect)
+          presetSelectEvent(i);
+
+        else if (controlMode == menu3) 
+          menu3Event(i);
+      }  
     }
-  
-    if (bp_event[1]) {
-      println_("BP2");
-      bp_event[1] = false;
-  
-      if (controlMode == effectsOnOff) {
-        mod_en = (mod_en==ON) ? OFF : ON;
-        byte data[1] = {(mod_en==ON) ? (byte)1 : (byte)0};
-        send_sysex(EN_MOD, data, 1, SYSEX_WRITE);
-        print("EN_MOD : ");
-        println(mod_en);
-      } else if (controlMode == presetSelect) {
-        preset = Ch1;
-        recallPreset(preset);
-      }
-    }
-  
-    if (bp_event[2]) {
-      println_("BP3");
-      bp_event[2] = false;
-  
-      if (controlMode == effectsOnOff) {
-        fx_en = (fx_en==ON) ? OFF : ON;
-        byte data[1] = {(fx_en==ON) ? (byte)1 : (byte)0};
-        send_sysex(EN_FX, data, 1, SYSEX_WRITE);
-        print("EN_FX : ");
-        println(fx_en);
-      } else if (controlMode == presetSelect) {
-        preset = Ch2;
-        recallPreset(preset);
-      }
-    }
-  
-    if (bp_event[3]) {
-      println_("BP4");
-      bp_event[3] = false;
-      
-      if (controlMode == effectsOnOff) {
-        delay_en = (delay_en==ON) ? OFF : ON;
-        byte data[1] = {(delay_en==ON) ? (byte)1 : (byte)0};
-        send_sysex(EN_DELAY, data, 1, SYSEX_WRITE);
-        print("EN_DELAY : ");
-        println(delay_en);
-      } else if (controlMode == presetSelect) {
-        preset = Ch3;
-        recallPreset(preset);
-      }
-    }
-  
-    if (bp_event[4]) {
-      println_("BP5");
-      bp_event[4] = false;
-  
-      if (controlMode == effectsOnOff) {
-        reverb_en = (reverb_en==ON) ? OFF : ON;
-        byte data[1] = {(reverb_en==ON) ? (byte)1 : (byte)0};
-        send_sysex(EN_REVERB, data, 1, SYSEX_WRITE);
-        print("EN_REVERB : ");
-        println(reverb_en);
-      } else if (controlMode == presetSelect) {
-        preset = Ch4;
-        recallPreset(preset);
-      }
-    }
-  
+
     if (bp_event[5]) {
       println_("BP6");
-      bp_event[5] = false;
+      bp_event[5] = 0;
   
       if(controlMode == effectsOnOff) {
         controlMode = presetSelect;
@@ -599,8 +598,6 @@ void loop() {
         controlMode = effectsOnOff;      
         println("controlMode : effectsOnOff");
       }
-  
     }
   }
-
 }

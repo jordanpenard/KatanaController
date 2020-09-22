@@ -39,6 +39,7 @@ const byte SYSEX_END = 0xF7;
 const unsigned long P_EDIT =      0x7F000001;
 const unsigned long PRESET =      0x00010000;
 const unsigned long VOLUME =      0x60000652;
+const unsigned long AMP_TYPE =    0x60000650;
 
 // Turning effects on and off
 const unsigned long EN_BOOSTER =  0x60000010;
@@ -53,6 +54,13 @@ const unsigned long GRY_MOD =     0x6000063A;
 const unsigned long GRY_FX =      0x6000063B;
 const unsigned long GRY_DELAY =   0x6000063C;
 const unsigned long GRY_REVERB =  0x6000063D;
+
+// Read only
+const unsigned long R_BOOSTER =   0x6000065D;
+const unsigned long R_MOD =       0x6000065E;
+const unsigned long R_FX =        0x6000065F;
+const unsigned long R_DELAY =     0x60000660;
+const unsigned long R_REVERB =    0x60000661;
 
 // Preset names
 const unsigned long PANNEL_NAME = 0x10000000;
