@@ -23,12 +23,17 @@
   void println(int s, int b = DEC) { }
 #endif
 
+#define BP_DEBOUNCE_MS 1000
+
+#define NB_BP 5
 #define BP_1 34
 #define BP_2 35
 #define BP_3 36
 #define BP_4 37
 #define BP_5 38
-#define BP_6 39
+
+#define BP_MENU 39
+#define BP_MUTE 33
 
 const byte SYSEX_WRITE = 0x12;
 const byte SYSEX_READ = 0x11;

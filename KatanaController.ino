@@ -9,14 +9,12 @@
 
 LiquidCrystal_I2C lcd(0x27,20,4);  // set the LCD address to 0x27 for a 16 chars and 2 line display
 
-uint8_t bp_event[6] = {0};
-
 USBHost myusb;
 USBHub hub1(myusb);
 USBHub hub2(myusb);
 MIDIDevice_BigBuffer midi1(myusb);
 
-typedef enum {effectsOnOff = 0, presetSelect = 1, menu3 = 2} controlMode_t;
+typedef enum {effectsOnOff = 0, presetSelect = 1, ampTypeSelect = 2} controlMode_t;
 typedef enum {GREEN = 0, RED = 1, YELLOW = 2} GRY_t;
 typedef enum {ON = 1, OFF = 0} on_off_t;
 typedef enum {Pannel = 0, Ch1 = 1, Ch2 = 2, Ch3 = 5, Ch4 = 6} preset_t;
@@ -31,6 +29,10 @@ uint8_t vol_level;
 char pannel_name[16], ch1_name[16], ch2_name[16], ch3_name[16], ch4_name[16] = {0};
 on_off_t vol_mute = OFF;
 uint8_t madeEdits = 0;
+
+uint8_t bp_event[NB_BP] = {0};
+uint8_t bp_menu_event = 0;
+uint8_t bp_mute_event = 0;
 
 
 byte checksum(byte const *data, byte dataLength) {
@@ -69,9 +71,9 @@ void setEditorMode(bool active = true) {
 }
 
 void isr_bp(uint8_t bp) {
-  static unsigned long last_event[6] = {0};
+  static unsigned long last_event[NB_BP] = {0};
 
-  if (millis() - last_event[bp] > 1000) {
+  if (millis() - last_event[bp] > BP_DEBOUNCE_MS) {
     bp_event[bp] = 1;
     last_event[bp] = millis();
   }
@@ -97,8 +99,22 @@ void isr_bp5() {
   isr_bp(4);
 }
 
-void isr_bp6() {
-  isr_bp(5);
+void isr_bp_menu() {
+  static unsigned long last_event = 0;
+
+  if (millis() - last_event > BP_DEBOUNCE_MS) {
+    bp_menu_event = 1;
+    last_event = millis();
+  }
+}
+
+void isr_bp_mute() {
+  static unsigned long last_event = 0;
+
+  if (millis() - last_event > BP_DEBOUNCE_MS) {
+    bp_mute_event = 1;
+    last_event = millis();
+  }
 }
 
 const char * toString(on_off_t s) { 
@@ -397,6 +413,10 @@ void refreshScreen() {
       lcd.print("  ");
     lcd.print(toString(preset));
     lcd.print("  ");
+    if(controlMode == ampTypeSelect)
+      lcd.print("> ");
+    else
+      lcd.print("  ");
     lcd.print(toString(amp_type));
     
     lcd.setCursor(0,2);
@@ -481,14 +501,16 @@ void setup() {
   pinMode(BP_3, INPUT_PULLUP);
   pinMode(BP_4, INPUT_PULLUP);
   pinMode(BP_5, INPUT_PULLUP);
-  pinMode(BP_6, INPUT_PULLUP);
+  pinMode(BP_MENU, INPUT_PULLUP);
+  pinMode(BP_MUTE, INPUT_PULLUP);
 
   attachInterrupt(digitalPinToInterrupt(BP_1), isr_bp1, FALLING);
   attachInterrupt(digitalPinToInterrupt(BP_2), isr_bp2, FALLING);
   attachInterrupt(digitalPinToInterrupt(BP_3), isr_bp3, FALLING);
   attachInterrupt(digitalPinToInterrupt(BP_4), isr_bp4, FALLING);
   attachInterrupt(digitalPinToInterrupt(BP_5), isr_bp5, FALLING);
-  attachInterrupt(digitalPinToInterrupt(BP_6), isr_bp6, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BP_MENU), isr_bp_menu, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BP_MUTE), isr_bp_mute, FALLING);
 
   lcd.init();
   lcd.init();
@@ -501,22 +523,30 @@ void setup() {
   myusb.begin();
 }
 
-void menu3Event(uint8_t bp) {
+void muteToggle() {
   byte data[1];
-  if (bp == 0) {
-    uint8_t madeEditsBak = madeEdits;
-    if (vol_mute == ON) {
-      vol_mute = OFF;
-      data[0] = {(byte)vol_level};
-      send_sysex(VOLUME, data, 1, SYSEX_WRITE, 1);
-      println("Unmutted");
-    } else {
-      vol_mute = ON;
-      data[0] = {(byte)0};
-      send_sysex(VOLUME, data, 1, SYSEX_WRITE, 1);
-      println("Muted");
-    }
-    madeEdits = madeEditsBak;
+  uint8_t madeEditsBak = madeEdits;
+  if (vol_mute == ON) {
+    vol_mute = OFF;
+    data[0] = {(byte)vol_level};
+    send_sysex(VOLUME, data, 1, SYSEX_WRITE, 1);
+    println("Unmutted");
+  } else {
+    vol_mute = ON;
+    data[0] = {(byte)0};
+    send_sysex(VOLUME, data, 1, SYSEX_WRITE, 1);
+    println("Muted");
+  }
+  madeEdits = madeEditsBak;
+  refreshScreen();  
+}
+
+void ampTypeSelectEvent(uint8_t bp) {
+  if (bp != amp_type) {
+    uint8_t data[1] = {bp};
+    send_sysex(AMP_TYPE, data, 1, SYSEX_WRITE, 1);
+    amp_type = (amp_type_t)bp;
+    madeEdits = 1;
     refreshScreen();
   }
 }
@@ -540,23 +570,23 @@ void effectsOnOffEvent(uint8_t bp) {
   byte data[1];
   if (bp == 0) {
     booster_en = (booster_en==ON) ? OFF : ON;
-    data[0] = {(booster_en==ON) ? (byte)1 : (byte)0};
+    data[0] = (booster_en==ON) ? (byte)1 : (byte)0;
     send_sysex(EN_BOOSTER, data, 1, SYSEX_WRITE, 1);
   } else if (bp == 1) {
     mod_en = (mod_en==ON) ? OFF : ON;
-    data[0] = {(mod_en==ON) ? (byte)1 : (byte)0};
+    data[0] = (mod_en==ON) ? (byte)1 : (byte)0;
     send_sysex(EN_MOD, data, 1, SYSEX_WRITE, 1);
   } else if (bp == 2) {
     fx_en = (fx_en==ON) ? OFF : ON;
-    data[0] = {(fx_en==ON) ? (byte)1 : (byte)0};
+    data[0] = (fx_en==ON) ? (byte)1 : (byte)0;
     send_sysex(EN_FX, data, 1, SYSEX_WRITE, 1);
   } else if (bp == 3) {
     delay_en = (delay_en==ON) ? OFF : ON;
-    data[0] = {(delay_en==ON) ? (byte)1 : (byte)0};
+    data[0] = (delay_en==ON) ? (byte)1 : (byte)0;
     send_sysex(EN_DELAY, data, 1, SYSEX_WRITE, 1);
   } else if (bp == 4) {
     reverb_en = (reverb_en==ON) ? OFF : ON;
-    data[0] = {(reverb_en==ON) ? (byte)1 : (byte)0};
+    data[0] = (reverb_en==ON) ? (byte)1 : (byte)0;
     send_sysex(EN_REVERB, data, 1, SYSEX_WRITE, 1);
   }
   madeEdits = 1;
@@ -574,7 +604,7 @@ void loop() {
 
   } else {
 
-    for (uint8_t i = 0; i < 5; i++) {
+    for (uint8_t i = 0; i < NB_BP; i++) {
       if (bp_event[i]) {
         print_("BP");
         println_(i+1);
@@ -586,22 +616,28 @@ void loop() {
         else if (controlMode == presetSelect)
           presetSelectEvent(i);
 
-        else if (controlMode == menu3) 
-          menu3Event(i);
+        else if (controlMode == ampTypeSelect) 
+          ampTypeSelectEvent(i);
       }  
     }
 
-    if (bp_event[5]) {
-      println_("BP6");
-      bp_event[5] = 0;
+    if (bp_mute_event) {
+      println_("BP_MUTE");
+      bp_mute_event = 0;
+      muteToggle();
+    }
+    
+    if (bp_menu_event) {
+      println_("BP_MENU");
+      bp_menu_event = 0;
   
       if(controlMode == effectsOnOff) {
         controlMode = presetSelect;
         println("controlMode : presetSelect");
       } else if(controlMode == presetSelect) {
-        controlMode = menu3;      
-        println("controlMode : menu3");
-      } else if(controlMode == menu3) {
+        controlMode = ampTypeSelect;      
+        println("controlMode : ampTypeSelect");
+      } else if(controlMode == ampTypeSelect) {
         controlMode = effectsOnOff;      
         println("controlMode : effectsOnOff");
       }
