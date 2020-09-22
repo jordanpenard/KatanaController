@@ -16,23 +16,19 @@ USBHub hub1(myusb);
 USBHub hub2(myusb);
 MIDIDevice_BigBuffer midi1(myusb);
 
-enum controlMode_t {effectsOnOff, presetSelect, menu3};
-enum controlMode_t controlMode = effectsOnOff;
+typedef enum {effectsOnOff, presetSelect, menu3} controlMode_t;
+typedef enum {GREEN=0, RED=1, YELLOW=2} GRY_t;
+typedef enum {ON=1, OFF=0} on_off_t;
+typedef enum {Pannel = 0, Ch1 = 1, Ch2 = 2, Ch3 = 5, Ch4 = 6} preset_t;
+typedef enum {Acoustic, Clean, Crunch, Lead, Brown} amp_t;
 
-enum GRY_t {GREEN=0, RED=1, YELLOW=2};
-enum GRY_t booster_gry, mod_gry, fx_gry, delay_gry, reverb_gry;
-
-enum on_off_t {ON=1, OFF=0};
-enum on_off_t booster_en, mod_en, fx_en, delay_en, reverb_en;
-
-enum preset_t {Pannel = 0, Ch1 = 1, Ch2 = 2, Ch3 = 5, Ch4 = 6};
-enum preset_t preset;
-
+controlMode_t controlMode = effectsOnOff;
+GRY_t booster_gry, mod_gry, fx_gry, delay_gry, reverb_gry;
+on_off_t booster_en, mod_en, fx_en, delay_en, reverb_en;
+preset_t preset;
 uint8_t vol_level;
-enum on_off_t vol_mute = OFF;
-
 char pannel_name[16], ch1_name[16], ch2_name[16], ch3_name[16], ch4_name[16] = {0};
-
+on_off_t vol_mute = OFF;
 uint8_t madeEdits = 0;
 
 
@@ -104,14 +100,14 @@ void isr_bp6() {
   isr_bp(6);
 }
 
-void println(enum on_off_t s) { 
+void println(on_off_t s) { 
   if(s == ON)
     println("ON");
   else
     println("OFF");
 }
 
-void println(enum GRY_t s, int b = DEC) { 
+void println(GRY_t s, int b = DEC) { 
   if (s == GREEN)
     println("GREEN");
   else if (s == RED)
@@ -120,7 +116,7 @@ void println(enum GRY_t s, int b = DEC) {
     println("YELLOW");
 }
 
-void println(enum preset_t s, int b = DEC) { 
+void println(preset_t s, int b = DEC) { 
   if (s == Pannel)
     println("Pannel");
   else if (s == Ch1)
@@ -327,13 +323,13 @@ void readFullStatus() {
   madeEdits = 0;
 }
 
-void lcdPrintGRY(enum GRY_t s) { 
+void lcdPrintGRY(GRY_t s) { 
   if (s == GREEN)
-    lcd.print("GREEN ");
+    lcd.print("G");
   else if (s == RED)
-    lcd.print("RED   ");
+    lcd.print("R");
   else
-    lcd.print("YELLOW");
+    lcd.print("Y");
 }
 
 void refreshScreen() {
@@ -347,7 +343,9 @@ void refreshScreen() {
     lcd.print("                    ");
     lcd.setCursor(0,3);
     lcd.print("                    ");
+  
   } else {
+  
     if(madeEdits)
       lcd.print("*");
     else
@@ -381,40 +379,46 @@ void refreshScreen() {
       lcd.print("B-Ch1     ");
     else if(preset == Ch4)
       lcd.print("B-Ch2     ");
-  
-    lcd.print("BST:");
+
+    // Amp type
+    lcd.print("          ");
+    
+    lcd.setCursor(0,2);  
+    lcd.print("BST MOD  FX  DEL REV");
+
+    lcd.setCursor(0,3);
+
+    lcd.print(" ");
     if(booster_en == OFF)
-      lcd.print("OFF   ");
+      lcd.print(" ");
     else
       lcdPrintGRY(booster_gry);
-  
-    lcd.setCursor(0,2);
-  
-    lcd.print("MOD:");
+
+    lcd.print("   ");
     if(mod_en == OFF)
-      lcd.print("OFF   ");
+      lcd.print(" ");
     else
       lcdPrintGRY(mod_gry);
   
-    lcd.print("FX :");
+    lcd.print("   ");
     if(fx_en == OFF)
-      lcd.print("OFF   ");
+      lcd.print(" ");
     else
       lcdPrintGRY(fx_gry);
   
-    lcd.setCursor(0,3);
-  
-    lcd.print("DEL:");
+    lcd.print("    ");
     if(delay_en == OFF)
-      lcd.print("OFF   ");
+      lcd.print(" ");
     else
       lcdPrintGRY(delay_gry);
   
-    lcd.print("REV:");
+    lcd.print("   ");
     if(reverb_en == OFF)
-      lcd.print("OFF   ");
+      lcd.print(" ");
     else
       lcdPrintGRY(reverb_gry);
+      
+    lcd.print(" ");
   }
 }
 
