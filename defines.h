@@ -35,6 +35,25 @@
 #define BP_MENU 39
 #define BP_MUTE 33
 
+#define LED_BP_1 7
+#define LED_BP_2 6
+#define LED_BP_3 5
+#define LED_BP_4 4
+#define LED_BP_5 3
+
+#define LED_MENU 2
+#define LED_MUTE 8
+
+#define LCD_ADDRESS 0x27
+#define LCD_WIDTH   20 // LCD display width, in char
+#define LCD_HEIGHT  4  // LCD display height, in char
+
+#define OLED01_ADDRESS 0x3D
+#define OLED234_ADDRESS 0x3C
+#define OLED_WIDTH   128 // OLED display width, in pixels
+#define OLED_HEIGHT  64  // OLED display height, in pixels
+
+
 const byte SYSEX_WRITE = 0x12;
 const byte SYSEX_READ = 0x11;
 const byte SYSEX_START = 0xF0;

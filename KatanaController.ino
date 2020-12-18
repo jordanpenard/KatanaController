@@ -3,11 +3,19 @@
 
 #include <Wire.h> 
 #include <LiquidCrystal_I2C.h>
+#include <Adafruit_SSD1306.h>
 #include <USBHost_t36.h>
 #include "defines.h"
 
 
-LiquidCrystal_I2C lcd(0x27,20,4);  // set the LCD address to 0x27 for a 16 chars and 2 line display
+LiquidCrystal_I2C lcd(LCD_ADDRESS,LCD_WIDTH,LCD_HEIGHT);
+
+Adafruit_SSD1306 oled[] = {
+  Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire2, -1),
+  Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire1, -1),
+  Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire2, -1),
+  Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire1, -1),
+  Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire, -1)};
 
 USBHost myusb;
 USBHub hub1(myusb);
@@ -34,6 +42,15 @@ uint8_t bp_event[NB_BP] = {0};
 uint8_t bp_menu_event = 0;
 uint8_t bp_mute_event = 0;
 
+
+void led_off(uint8_t io) {
+  pinMode(io, INPUT);
+}
+
+void led_on(uint8_t io) {
+  pinMode(io, OUTPUT);
+  digitalWrite(io, LOW);
+}
 
 uint8_t checksum(const uint8_t *data, uint8_t dataLength) {
     uint8_t sum = 0, i;
@@ -127,11 +144,11 @@ const char * toString(on_off_t s) {
 
 const char * toString(GRY_t s) { 
   if (s == GREEN)
-    return "G";
+    return "Green";
   else if (s == RED)
-    return "R";
+    return "Red";
   else if (s == YELLOW)
-    return "Y";
+    return "Yellow";
   else
     return NULL;
 }
@@ -373,16 +390,17 @@ void readFullStatus() {
 }
 
 void refreshScreen() {
+  lcd.clear();
   lcd.setCursor(0,0);
 
+  for(int i = 0; i<5; i++)
+    oled[i].clearDisplay();
+    
   if (!midi1) {
-    lcd.print("Waiting for Katana  ");
     lcd.setCursor(0,1);
-    lcd.print("to connect          ");
+    lcd.print(" Waiting for Katana ");
     lcd.setCursor(0,2);
-    lcd.print("                    ");
-    lcd.setCursor(0,3);
-    lcd.print("                    ");
+    lcd.print("     to connect     ");
   
   } else {
   
@@ -419,47 +437,68 @@ void refreshScreen() {
     else
       lcd.print("  ");
     lcd.print(toString(amp_type));
-    
-    lcd.setCursor(0,2);
-    lcd.print(" BST MOD FX DEL REV ");
 
-    lcd.setCursor(0,3);
+    if (controlMode == effectsOnOff) {
+      for(int i = 0; i<5; i++) {
+        oled[i].setCursor(0,0);
+        oled[i].setTextSize(4);
+      }
+      oled[0].println("Boost");
+      oled[1].println("Mod");
+      oled[2].println("FX");
+      oled[3].println("Delay");
+      oled[4].println("Rev");
 
-    if(controlMode == effectsOnOff)
-      lcd.print("> ");
-    else
-      lcd.print("  ");
-    if(booster_en == OFF)
-      lcd.print(" ");
-    else
-      lcd.print(toString(booster_gry));
-
-    lcd.print("   ");
-    if(mod_en == OFF)
-      lcd.print(" ");
-    else
-      lcd.print(toString(mod_gry));
-  
-    lcd.print("  ");
-    if(fx_en == OFF)
-      lcd.print(" ");
-    else
-      lcd.print(toString(fx_gry));
-  
-    lcd.print("   ");
-    if(delay_en == OFF)
-      lcd.print(" ");
-    else
-      lcd.print(toString(delay_gry));
-  
-    lcd.print("   ");
-    if(reverb_en == OFF)
-      lcd.print(" ");
-    else
-      lcd.print(toString(reverb_gry));
+      for(int i = 0; i<5; i++) {
+        oled[i].setTextSize(2);
+        oled[i].println("?");
+      }
+      if (booster_en == ON)
+        oled[0].println(toString(booster_gry));
+      if (mod_en == ON)
+        oled[1].println(toString(mod_gry));
+      if (fx_en == ON)
+        oled[2].println(toString(fx_gry));
+      if (delay_en == ON)
+        oled[3].println(toString(delay_gry));
+      if (reverb_en == ON)
+        oled[4].println(toString(reverb_gry));
+        
+    } else if (controlMode == presetSelect) {
+      for(int i = 0; i<5; i++) {
+        oled[i].setCursor(0,0);
+        oled[i].setTextSize(2);
+      }
+      oled[0].setTextSize(3);
+      oled[0].println("Pannel");
+      oled[1].println(ch1_name);
+      oled[2].println(ch2_name);
+      oled[3].println(ch3_name);
+      oled[4].println(ch4_name);
+      if (preset <= 2) {
+        oled[preset].setTextSize(3);
+        oled[preset].println("   *");
+      } else {
+        oled[preset-2].setTextSize(3);
+        oled[preset-2].println("   *");
+      }
       
-    lcd.print("  ");
+    } else if (controlMode == ampTypeSelect) {
+      for(int i = 0; i<5; i++) {
+        oled[i].setCursor(0,0);
+        oled[i].setTextSize(3);
+      }
+      oled[0].println("Acousti");
+      oled[1].println("Clean");
+      oled[2].println("Crunch");
+      oled[3].println("Leed");
+      oled[4].println("Brown");    
+      oled[amp_type].println("   *");
+    }
   }
+
+  for(int i = 0; i<5; i++)
+    oled[i].display();
 }
 
 void initKatana() {
@@ -496,14 +535,39 @@ void initKatana() {
   println("Ready");
 }
 
+void init_oled() {
+  for(int i = 0; i<5; i++) {
+    // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
+    if(!oled[i].begin(SSD1306_SWITCHCAPVCC, (i<=1) ? OLED01_ADDRESS : OLED234_ADDRESS)) { 
+      Serial.print("OLED ");
+      Serial.print(i);
+      Serial.println(" allocation failed");
+      for(;;); // Don't proceed, loop forever
+    }
+
+    // Clear the buffer
+    oled[i].clearDisplay();
+    oled[i].setTextColor(WHITE);
+  }
+}
+
 void setup() {
-  pinMode(BP_1, INPUT_PULLUP);
-  pinMode(BP_2, INPUT_PULLUP);
-  pinMode(BP_3, INPUT_PULLUP);
-  pinMode(BP_4, INPUT_PULLUP);
-  pinMode(BP_5, INPUT_PULLUP);
-  pinMode(BP_MENU, INPUT_PULLUP);
-  pinMode(BP_MUTE, INPUT_PULLUP);
+
+  led_off(LED_MUTE);
+  led_off(LED_MENU);
+  led_off(LED_BP_1);
+  led_off(LED_BP_2);
+  led_off(LED_BP_3);
+  led_off(LED_BP_4);
+  led_off(LED_BP_5);
+
+  pinMode(BP_1, INPUT);
+  pinMode(BP_2, INPUT);
+  pinMode(BP_3, INPUT);
+  pinMode(BP_4, INPUT);
+  pinMode(BP_5, INPUT);
+  pinMode(BP_MENU, INPUT);
+  pinMode(BP_MUTE, INPUT);
 
   attachInterrupt(digitalPinToInterrupt(BP_1), isr_bp1, FALLING);
   attachInterrupt(digitalPinToInterrupt(BP_2), isr_bp2, FALLING);
@@ -516,6 +580,8 @@ void setup() {
   lcd.init();
   lcd.init();
   lcd.backlight();
+
+  init_oled();
 
 #ifdef DEBUG
   Serial.begin(115200);
@@ -645,4 +711,90 @@ void loop() {
       refreshScreen();
     }
   }
+
+  if(vol_mute == ON)
+    led_on(LED_MUTE);
+  else
+    led_off(LED_MUTE);
+
+  if (controlMode == effectsOnOff) {
+    if (booster_en)
+      led_on(LED_BP_1);
+    else
+      led_off(LED_BP_1);
+    
+    if (mod_en)
+      led_on(LED_BP_2);
+    else
+      led_off(LED_BP_2);
+    
+    if (fx_en)
+      led_on(LED_BP_3);
+    else
+      led_off(LED_BP_3);
+    
+    if (delay_en)
+      led_on(LED_BP_4);
+    else
+      led_off(LED_BP_4);
+        
+    if (reverb_en)
+      led_on(LED_BP_5);
+    else
+      led_off(LED_BP_5);
+  
+  } else if(controlMode == presetSelect) {
+    if (preset == Pannel)
+      led_on(LED_BP_1);
+    else
+      led_off(LED_BP_1);
+    
+    if (preset == Ch1)
+      led_on(LED_BP_2);
+    else
+      led_off(LED_BP_2);
+    
+    if (preset == Ch2)
+      led_on(LED_BP_3);
+    else
+      led_off(LED_BP_3);
+    
+    if (preset == Ch3)
+      led_on(LED_BP_4);
+    else
+      led_off(LED_BP_4);
+        
+    if (preset == Ch4)
+      led_on(LED_BP_5);
+    else
+      led_off(LED_BP_5);
+      
+  } else if(controlMode == ampTypeSelect) {
+    if (amp_type == Acoustic)
+      led_on(LED_BP_1);
+    else
+      led_off(LED_BP_1);
+    
+    if (amp_type == Clean)
+      led_on(LED_BP_2);
+    else
+      led_off(LED_BP_2);
+    
+    if (amp_type == Crunch)
+      led_on(LED_BP_3);
+    else
+      led_off(LED_BP_3);
+    
+    if (amp_type == Lead)
+      led_on(LED_BP_4);
+    else
+      led_off(LED_BP_4);
+        
+    if (amp_type == Brown)
+      led_on(LED_BP_5);
+    else
+      led_off(LED_BP_5);
+
+  }
+      
 }
