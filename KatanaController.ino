@@ -27,12 +27,14 @@ typedef enum {GREEN = 0, RED = 1, YELLOW = 2} GRY_t;
 typedef enum {ON = 1, OFF = 0} on_off_t;
 typedef enum {Pannel = 0, Ch1 = 1, Ch2 = 2, Ch3 = 5, Ch4 = 6} preset_t;
 typedef enum {Acoustic = 0, Clean = 1, Crunch = 2, Lead = 3, Brown = 4} amp_type_t;
+typedef enum {MidBST = 0, CleanBST = 1, TrebleBST = 2, CrunchOD = 3, NaturalOD = 4, WarmOD = 5, FatDS = 6, MetalDS = 8, OctFuzz = 9, BluesDrive = 10, Overdrive = 11, TScream = 12, TurboOD = 13, Distortion = 14, Rat = 15, GuvDS = 16, DSTp = 17, MetalZone = 18, SixtiesFuzz = 19, MuffFuzz = 20} booster_type_t;
 
 controlMode_t controlMode = effectsOnOff;
 GRY_t booster_gry, mod_gry, fx_gry, delay_gry, reverb_gry;
 on_off_t booster_en, mod_en, fx_en, delay_en, reverb_en;
 preset_t preset;
 amp_type_t amp_type;
+booster_type_t booster_type;
 uint8_t vol_level;
 char pannel_name[16], ch1_name[16], ch2_name[16], ch3_name[16], ch4_name[16] = {0};
 on_off_t vol_mute = OFF;
@@ -183,6 +185,51 @@ const char * toString(amp_type_t s) {
     return NULL;
 }
 
+const char * toString(booster_type_t s) {
+  if (s == MidBST)
+    return "MidBST";
+  else if (s == CleanBST)
+    return "CleanBST";
+  else if (s == TrebleBST)
+    return "TrebleBST";
+  else if (s == CrunchOD)
+    return "CrunchOD";
+  else if (s == NaturalOD)
+    return "NaturalOD";
+  else if (s == WarmOD)
+    return "WarmOD";
+  else if (s == FatDS)
+    return "FatDS";
+  else if (s == MetalDS)
+    return "MetalDS";
+  else if (s == OctFuzz)
+    return "OctFuzz";
+  else if (s == BluesDrive)
+    return "BluesDrive";
+  else if (s == Overdrive)
+    return "Overdrive";
+  else if (s == TScream)
+    return "TScream";
+  else if (s == TurboOD)
+    return "TurboOD";
+  else if (s == Distortion)
+    return "Distortion";
+  else if (s == Rat)
+    return "Rat";
+  else if (s == GuvDS)
+    return "GuvDS";
+  else if (s == DSTp)
+    return "DST+";
+  else if (s == MetalZone)
+    return "MetalZone";
+  else if (s == SixtiesFuzz)
+    return "60sFuzz";
+  else if (s == MuffFuzz)
+    return "MuffFuzz";
+  else
+    return NULL;
+}
+
 void handleSysEx(const uint8_t* sysExData, uint16_t sysExSize, bool complete) {
   //simple test to see if the complete message is available
   if(complete){
@@ -316,6 +363,12 @@ void handleSysEx(const uint8_t* sysExData, uint16_t sysExSize, bool complete) {
        print("Amp type : ");
        println(toString(amp_type));
        break;
+
+     case BOOSTER_TYPE:
+       booster_type = (booster_type_t)sysExData[12];
+       print("Booster type : ");
+       println(toString(booster_type));
+       break;
     }
   }   
 }
@@ -368,6 +421,8 @@ void readEffectStatus() {
   send_sysex(GRY_REVERB, data, 4, SYSEX_READ, 1);
 
   send_sysex(AMP_TYPE, data, 4, SYSEX_READ, 1);
+
+  send_sysex(BOOSTER_TYPE, data, 4, SYSEX_READ, 1);
 
   if(vol_mute == OFF)
     send_sysex(VOLUME, data, 4, SYSEX_READ, 1);  
@@ -451,8 +506,13 @@ void refreshScreen() {
 
       for(int i = 0; i<5; i++) {
         oled[i].setTextSize(2);
-        oled[i].println("?");
       }
+      oled[0].println(toString(booster_type));
+      oled[1].println("?");
+      oled[2].println("?");
+      oled[3].println("?");
+      oled[4].println("?");
+
       if (booster_en == ON)
         oled[0].println(toString(booster_gry));
       if (mod_en == ON)
@@ -561,13 +621,13 @@ void setup() {
   led_off(LED_BP_4);
   led_off(LED_BP_5);
 
-  pinMode(BP_1, INPUT);
-  pinMode(BP_2, INPUT);
-  pinMode(BP_3, INPUT);
-  pinMode(BP_4, INPUT);
-  pinMode(BP_5, INPUT);
-  pinMode(BP_MENU, INPUT);
-  pinMode(BP_MUTE, INPUT);
+  pinMode(BP_1, INPUT_PULLUP);
+  pinMode(BP_2, INPUT_PULLUP);
+  pinMode(BP_3, INPUT_PULLUP);
+  pinMode(BP_4, INPUT_PULLUP);
+  pinMode(BP_5, INPUT_PULLUP);
+  pinMode(BP_MENU, INPUT_PULLUP);
+  pinMode(BP_MUTE, INPUT_PULLUP);
 
   attachInterrupt(digitalPinToInterrupt(BP_1), isr_bp1, FALLING);
   attachInterrupt(digitalPinToInterrupt(BP_2), isr_bp2, FALLING);

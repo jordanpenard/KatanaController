@@ -92,3 +92,6 @@ const unsigned long CH1_NAME =    0x10010000;
 const unsigned long CH2_NAME =    0x10020000;
 const unsigned long CH3_NAME =    0x10050000;
 const unsigned long CH4_NAME =    0x10060000;
+
+// Effect type
+const unsigned long BOOSTER_TYPE = 0x60000011;
