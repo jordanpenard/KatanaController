@@ -28,6 +28,9 @@ typedef enum {ON = 1, OFF = 0} on_off_t;
 typedef enum {Pannel = 0, Ch1 = 1, Ch2 = 2, Ch3 = 5, Ch4 = 6} preset_t;
 typedef enum {Acoustic = 0, Clean = 1, Crunch = 2, Lead = 3, Brown = 4} amp_type_t;
 typedef enum {MidBST = 0, CleanBST = 1, TrebleBST = 2, CrunchOD = 3, NaturalOD = 4, WarmOD = 5, FatDS = 6, MetalDS = 8, OctFuzz = 9, BluesDrive = 10, Overdrive = 11, TScream = 12, TurboOD = 13, Distortion = 14, Rat = 15, GuvDS = 16, DSTp = 17, MetalZone = 18, SixtiesFuzz = 19, MuffFuzz = 20} booster_type_t;
+typedef enum {Chorus = 0x1d, DC30 = 0x26, Flanger = 0x14, Flanger117E = 0x24, Phaser = 0x13, Phaser90E = 0x23, UniV = 0x17, Tremolo = 0x15, Vibrato = 0x1a, Rotary = 0x16, RingMod = 0x1b, SlowGear = 0x0a, Slicer = 0x19, Compressor = 0x03, Limiter = 0x04, TWah = 0x00, AutoWah = 0x01, PedalWah = 0x02, Wah96E = 0x25, GraphicEQ = 0x06, ParaEQ = 0x07, GuitarSim = 0x09, ACGuitarSim = 0x1f, ACProcessor = 0x12, WaveSynth = 0x0c, Octave = 0x0e, HeavyOctave = 0x27, PitchShifter = 0x0f, Harmonist = 0x10, Humanizer = 0x1c} mod_fx_type_t;
+typedef enum {Digital = 0, PAN = 1, Stereo = 2, Reverse = 6, Analog = 7, TapeEcho = 8, Modulate = 9, SDE3000 = 10} delay_type_t;
+typedef enum {Room = 1, Hall = 3, Plate = 4, Spring = 5, Mod = 6} reverb_type_t;
 
 controlMode_t controlMode = effectsOnOff;
 GRY_t booster_gry, mod_gry, fx_gry, delay_gry, reverb_gry;
@@ -35,6 +38,10 @@ on_off_t booster_en, mod_en, fx_en, delay_en, reverb_en;
 preset_t preset;
 amp_type_t amp_type;
 booster_type_t booster_type;
+mod_fx_type_t mod_type;
+mod_fx_type_t fx_type;
+delay_type_t delay_type;
+reverb_type_t reverb_type;
 uint8_t vol_level;
 char pannel_name[16], ch1_name[16], ch2_name[16], ch3_name[16], ch4_name[16] = {0};
 on_off_t vol_mute = OFF;
@@ -230,6 +237,107 @@ const char * toString(booster_type_t s) {
     return NULL;
 }
 
+const char * toString(mod_fx_type_t s) {
+  if (s == Chorus)
+    return "Chorus";
+  else if (s == DC30)
+    return "DC30";
+  else if (s == Flanger)
+    return "Flanger";
+  else if (s == Flanger117E)
+    return "Flanger 117E";
+  else if (s == Phaser)
+    return "Phaser";
+  else if (s == Phaser90E)
+    return "Phaser 90E";
+  else if (s == UniV)
+    return "Uni V";
+  else if (s == Tremolo)
+    return "Tremolo";
+  else if (s == Vibrato)
+    return "Vibrato";
+  else if (s == Rotary)
+    return "Rotary";
+  else if (s == RingMod)
+    return "Ring Mod";
+  else if (s == SlowGear)
+    return "Slow Gear";
+  else if (s == Slicer)
+    return "Slicer";
+  else if (s == Compressor)
+    return "Compressor";
+  else if (s == Limiter)
+    return "Limiter";
+  else if (s == TWah)
+    return "T Wah";
+  else if (s == AutoWah)
+    return "Auto Wah";
+  else if (s == PedalWah)
+    return "Pedal Wah";
+  else if (s == Wah96E)
+    return "Wah 96E";
+  else if (s == GraphicEQ)
+    return "Graphic EQ";
+  else if (s == ParaEQ)
+    return "Para EQ";
+  else if (s == GuitarSim)
+    return "Guitar Sim";
+  else if (s == ACGuitarSim)
+    return "AC Guitar Sim";
+  else if (s == ACProcessor)
+    return "AC Processor";
+  else if (s == WaveSynth)
+    return "Wave Synth";
+  else if (s == Octave)
+    return "Octave";
+  else if (s == HeavyOctave)
+    return "Heavy Octave";
+  else if (s == PitchShifter)
+    return "Pitch Shifter";
+  else if (s == Harmonist)
+    return "Harmonist";
+  else if (s == Humanizer)
+    return "Humanizer";
+  else
+    return NULL;
+}
+
+const char * toString(delay_type_t s) {
+  if (s == Digital)
+    return "Digital";
+  else if (s == PAN)
+    return "PAN";
+  else if (s == Stereo)
+    return "Stereo";
+  else if (s == Reverse)
+    return "Reverse";
+  else if (s == Analog)
+    return "Analog";
+  else if (s == TapeEcho)
+    return "Tape Echo";
+  else if (s == Modulate)
+    return "Modulate";
+  else if (s == SDE3000)
+    return "SDE3000";
+  else
+    return NULL;
+}
+
+const char * toString(reverb_type_t s) {
+  if (s == Room)
+    return "Room";
+  else if (s == Hall)
+    return "Hall";
+  else if (s == Plate)
+    return "Plate";
+  else if (s == Spring)
+    return "Spring";
+  else if (s == Mod)
+    return "Modulate";
+  else
+    return NULL;
+}
+
 void handleSysEx(const uint8_t* sysExData, uint16_t sysExSize, bool complete) {
   //simple test to see if the complete message is available
   if(complete){
@@ -369,6 +477,30 @@ void handleSysEx(const uint8_t* sysExData, uint16_t sysExSize, bool complete) {
        print("Booster type : ");
        println(toString(booster_type));
        break;
+
+     case MOD_TYPE:
+       mod_type = (mod_fx_type_t)sysExData[12];
+       print("Mod type : ");
+       println(toString(mod_type));
+       break;
+
+     case FX_TYPE:
+       fx_type = (mod_fx_type_t)sysExData[12];
+       print("FX type : ");
+       println(toString(fx_type));
+       break;
+    
+     case DELAY_TYPE:
+       delay_type = (delay_type_t)sysExData[12];
+       print("Delay type : ");
+       println(toString(delay_type));
+       break;
+    
+     case REVERB_TYPE:
+       reverb_type = (reverb_type_t)sysExData[12];
+       print("Reverb type : ");
+       println(toString(reverb_type));
+       break;
     }
   }   
 }
@@ -423,6 +555,10 @@ void readEffectStatus() {
   send_sysex(AMP_TYPE, data, 4, SYSEX_READ, 1);
 
   send_sysex(BOOSTER_TYPE, data, 4, SYSEX_READ, 1);
+  send_sysex(MOD_TYPE, data, 4, SYSEX_READ, 1);
+  send_sysex(FX_TYPE, data, 4, SYSEX_READ, 1);
+  send_sysex(DELAY_TYPE, data, 4, SYSEX_READ, 1);
+  send_sysex(REVERB_TYPE, data, 4, SYSEX_READ, 1);
 
   if(vol_mute == OFF)
     send_sysex(VOLUME, data, 4, SYSEX_READ, 1);  
@@ -508,10 +644,10 @@ void refreshScreen() {
         oled[i].setTextSize(2);
       }
       oled[0].println(toString(booster_type));
-      oled[1].println("?");
-      oled[2].println("?");
-      oled[3].println("?");
-      oled[4].println("?");
+      oled[1].println(toString(mod_type));
+      oled[2].println(toString(fx_type));
+      oled[3].println(toString(delay_type));
+      oled[4].println(toString(reverb_type));
 
       if (booster_en == ON)
         oled[0].println(toString(booster_gry));

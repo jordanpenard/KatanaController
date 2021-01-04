@@ -93,5 +93,9 @@ const unsigned long CH2_NAME =    0x10020000;
 const unsigned long CH3_NAME =    0x10050000;
 const unsigned long CH4_NAME =    0x10060000;
 
-// Effect type
+// Effect type (read only ?)
 const unsigned long BOOSTER_TYPE = 0x60000011;
+const unsigned long MOD_TYPE =     0x60000101;
+const unsigned long FX_TYPE =      0x60000301;
+const unsigned long DELAY_TYPE =   0x60000501;
+const unsigned long REVERB_TYPE =  0x60000541;
