@@ -1,7 +1,8 @@
 //#define DEBUG
 //#define DEBUG_VERBOSE
 
-#include <Wire.h> 
+#include <Wire.h>
+#include <SPI.h>
 #include <LiquidCrystal_I2C.h>
 #include <Adafruit_SSD1306.h>
 #include <USBHost_t36.h>
@@ -15,14 +16,16 @@ Adafruit_SSD1306 oled[] = {
   Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire1, -1),
   Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire2, -1),
   Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire1, -1),
-  Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire, -1)};
-
+  Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, &Wire, -1),
+  Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, OLED_SPI_D1_DATA, OLED_SPI_D0_CLK, OLED_SPI_DC, -1, OLED5_SPI_CS),
+  Adafruit_SSD1306(OLED_WIDTH, OLED_HEIGHT, OLED_SPI_D1_DATA, OLED_SPI_D0_CLK, OLED_SPI_DC, -1, OLED6_SPI_CS)};
+  
 USBHost myusb;
 USBHub hub1(myusb);
 USBHub hub2(myusb);
 MIDIDevice_BigBuffer midi1(myusb);
 
-typedef enum {effectsOnOff = 0, presetSelect = 1, ampTypeSelect = 2} controlMode_t;
+typedef enum {menu = 0, effectsOnOff = 1, presetSelect = 2, ampTypeSelect = 3} controlMode_t;
 typedef enum {GREEN = 0, RED = 1, YELLOW = 2} GRY_t;
 typedef enum {ON = 1, OFF = 0} on_off_t;
 typedef enum {Pannel = 0, Ch1 = 1, Ch2 = 2, Ch3 = 5, Ch4 = 6} preset_t;
@@ -48,10 +51,19 @@ on_off_t vol_mute = OFF;
 uint8_t madeEdits = 0;
 
 uint8_t bp_event[NB_BP] = {0};
-uint8_t bp_menu_event = 0;
-uint8_t bp_mute_event = 0;
 
+struct menuItem {
+  char name[20];
+  controlMode_t destination;
+};
 
+int menuPageId = 0;
+
+struct menuItem mainMenu[] = {
+  {"effectsOnOff", effectsOnOff},
+  {"presetSelect", presetSelect},
+  {"ampTypeSelect", ampTypeSelect}};
+  
 void led_off(uint8_t io) {
   pinMode(io, INPUT);
 }
@@ -106,42 +118,32 @@ void isr_bp(uint8_t bp) {
   }
 }
 
-void isr_bp1() {
+void isr_bp0() {
   isr_bp(0);
 }
 
-void isr_bp2() {
+void isr_bp1() {
   isr_bp(1);
 }
 
-void isr_bp3() {
+void isr_bp2() {
   isr_bp(2);
 }
 
-void isr_bp4() {
+void isr_bp3() {
   isr_bp(3);
 }
 
-void isr_bp5() {
+void isr_bp4() {
   isr_bp(4);
 }
 
-void isr_bp_menu() {
-  static uint32_t last_event = 0;
-
-  if (millis() - last_event > BP_DEBOUNCE_MS) {
-    bp_menu_event = 1;
-    last_event = millis();
-  }
+void isr_bp5() {
+  isr_bp(5);
 }
 
-void isr_bp_mute() {
-  static uint32_t last_event = 0;
-
-  if (millis() - last_event > BP_DEBOUNCE_MS) {
-    bp_mute_event = 1;
-    last_event = millis();
-  }
+void isr_bp6() {
+  isr_bp(6);
 }
 
 const char * toString(on_off_t s) { 
@@ -166,13 +168,13 @@ const char * toString(preset_t preset) {
   if(preset == Pannel)
     return "Pannel";
   else if(preset == Ch1)
-    return "A-Ch1 ";
+    return "Preset 1 ";
   else if(preset == Ch2)
-    return "A-Ch2 ";
+    return "Preset 2 ";
   else if(preset == Ch3)
-    return "B-Ch1 ";
+    return "Preset 3 ";
   else if(preset == Ch4)
-    return "B-Ch2 ";
+    return "Preset 4 ";
   else
     return NULL;
 }
@@ -580,11 +582,136 @@ void readFullStatus() {
   madeEdits = 0;
 }
 
+void oledDisplayMenu(){  
+  for(int i = 0; i<5; i++) {
+    oled[i].setCursor(0,0);
+    oled[i].setTextSize(3);
+  }
+
+  if(menuPageId != 0) {
+    oled[5].setCursor(0,0);
+    oled[5].setTextSize(8);
+    oled[5].println("<");
+  }
+
+  if(menuPageId * 5 + 5 < MAIN_MENU_SIZE) {
+    oled[6].setCursor(0,0);
+    oled[6].setTextSize(8);
+    oled[6].println(">");
+  }
+
+  for(int i = 0; i < 5; i++) {
+    if (i + menuPageId * 5 < MAIN_MENU_SIZE)
+      oled[i].println(mainMenu[i + menuPageId * 5].name);
+  }
+}
+
+void oledDisplayEffects() {
+  for(int i = 0; i<5; i++) {
+    oled[i].setCursor(0,0);
+    oled[i].setTextSize(4);
+  }
+  oled[0].println("Boost");
+  oled[1].println("Mod");
+  oled[2].println("FX");
+  oled[3].println("Delay");
+  oled[4].println("Rev");
+  
+  for(int i = 0; i<5; i++) {
+    oled[i].setTextSize(2);
+  }
+  oled[0].println(toString(booster_type));
+  oled[1].println(toString(mod_type));
+  oled[2].println(toString(fx_type));
+  oled[3].println(toString(delay_type));
+  oled[4].println(toString(reverb_type));
+  
+  if (booster_en == ON)
+    oled[0].println(toString(booster_gry));
+  if (mod_en == ON)
+    oled[1].println(toString(mod_gry));
+  if (fx_en == ON)
+    oled[2].println(toString(fx_gry));
+  if (delay_en == ON)
+    oled[3].println(toString(delay_gry));
+  if (reverb_en == ON)
+    oled[4].println(toString(reverb_gry));
+}
+
+void oledDisplayPreset() {
+  for(int i = 0; i<5; i++) {
+    oled[i].setCursor(0,0);
+    oled[i].setTextSize(2);
+  }
+  oled[0].setTextSize(3);
+  oled[0].println("Pannel");
+  oled[1].println(ch1_name);
+  oled[2].println(ch2_name);
+  oled[3].println(ch3_name);
+  oled[4].println(ch4_name);
+  if (preset <= 2) {
+    oled[preset].setTextSize(3);
+    oled[preset].println("   *");
+  } else {
+    oled[preset-2].setTextSize(3);
+    oled[preset-2].println("   *");
+  }
+}
+
+void oledDisplayAmpType() {
+  for(int i = 0; i<5; i++) {
+    oled[i].setCursor(0,0);
+    oled[i].setTextSize(3);
+  }
+  oled[0].println("Acousti");
+  oled[1].println("Clean");
+  oled[2].println("Crunch");
+  oled[3].println("Leed");
+  oled[4].println("Brown");    
+  oled[amp_type].println("   *");
+}
+
+void lcdDisplayHome() {
+  if(madeEdits)
+    lcd.print("*");
+  else
+    lcd.print(" ");
+
+  if(preset == Pannel)
+    lcd.print(pannel_name);
+  else if(preset == Ch1)
+    lcd.print(ch1_name);
+  else if(preset == Ch2)
+    lcd.print(ch2_name);
+  else if(preset == Ch3)
+    lcd.print(ch3_name);
+  else if(preset == Ch4)
+    lcd.print(ch4_name);
+  
+  if(vol_mute == ON)
+    lcd.print("MUTE");
+  else
+    lcd.print("    ");
+
+  lcd.setCursor(0,1);
+  if(controlMode == presetSelect)
+    lcd.print("> ");
+  else
+    lcd.print("  ");
+  lcd.print(toString(preset));
+  lcd.print("  ");
+  if(controlMode == ampTypeSelect)
+    lcd.print("> ");
+  else
+    lcd.print("  ");
+  lcd.print(toString(amp_type));  
+}
+
 void refreshScreen() {
   lcd.clear();
   lcd.setCursor(0,0);
 
-  for(int i = 0; i<5; i++)
+  for(int i = 0; i<7; i++)
     oled[i].clearDisplay();
     
   if (!midi1) {
@@ -594,106 +721,31 @@ void refreshScreen() {
     lcd.print("     to connect     ");
   
   } else {
-  
-    if(madeEdits)
-      lcd.print("*");
-    else
-      lcd.print(" ");
-  
-    if(preset == Pannel)
-      lcd.print(pannel_name);
-    else if(preset == Ch1)
-      lcd.print(ch1_name);
-    else if(preset == Ch2)
-      lcd.print(ch2_name);
-    else if(preset == Ch3)
-      lcd.print(ch3_name);
-    else if(preset == Ch4)
-      lcd.print(ch4_name);
+
+    lcdDisplayHome();
+
+    if (controlMode == effectsOnOff)
+      oledDisplayEffects();    
+    else if (controlMode == presetSelect)
+      oledDisplayPreset();  
+    else if (controlMode == ampTypeSelect)
+      oledDisplayAmpType();
+    else if(controlMode == menu) {
+      oledDisplayMenu();
+    }
     
-    if(vol_mute == ON)
-      lcd.print("MUTE");
-    else
-      lcd.print("    ");
+    if(controlMode != menu) {
+      oled[5].setCursor(0,15);
+      oled[5].setTextSize(5);
+      oled[5].println("Mute"); 
   
-    lcd.setCursor(0,1);
-    if(controlMode == presetSelect)
-      lcd.print("> ");
-    else
-      lcd.print("  ");
-    lcd.print(toString(preset));
-    lcd.print("  ");
-    if(controlMode == ampTypeSelect)
-      lcd.print("> ");
-    else
-      lcd.print("  ");
-    lcd.print(toString(amp_type));
-
-    if (controlMode == effectsOnOff) {
-      for(int i = 0; i<5; i++) {
-        oled[i].setCursor(0,0);
-        oled[i].setTextSize(4);
-      }
-      oled[0].println("Boost");
-      oled[1].println("Mod");
-      oled[2].println("FX");
-      oled[3].println("Delay");
-      oled[4].println("Rev");
-
-      for(int i = 0; i<5; i++) {
-        oled[i].setTextSize(2);
-      }
-      oled[0].println(toString(booster_type));
-      oled[1].println(toString(mod_type));
-      oled[2].println(toString(fx_type));
-      oled[3].println(toString(delay_type));
-      oled[4].println(toString(reverb_type));
-
-      if (booster_en == ON)
-        oled[0].println(toString(booster_gry));
-      if (mod_en == ON)
-        oled[1].println(toString(mod_gry));
-      if (fx_en == ON)
-        oled[2].println(toString(fx_gry));
-      if (delay_en == ON)
-        oled[3].println(toString(delay_gry));
-      if (reverb_en == ON)
-        oled[4].println(toString(reverb_gry));
-        
-    } else if (controlMode == presetSelect) {
-      for(int i = 0; i<5; i++) {
-        oled[i].setCursor(0,0);
-        oled[i].setTextSize(2);
-      }
-      oled[0].setTextSize(3);
-      oled[0].println("Pannel");
-      oled[1].println(ch1_name);
-      oled[2].println(ch2_name);
-      oled[3].println(ch3_name);
-      oled[4].println(ch4_name);
-      if (preset <= 2) {
-        oled[preset].setTextSize(3);
-        oled[preset].println("   *");
-      } else {
-        oled[preset-2].setTextSize(3);
-        oled[preset-2].println("   *");
-      }
-      
-    } else if (controlMode == ampTypeSelect) {
-      for(int i = 0; i<5; i++) {
-        oled[i].setCursor(0,0);
-        oled[i].setTextSize(3);
-      }
-      oled[0].println("Acousti");
-      oled[1].println("Clean");
-      oled[2].println("Crunch");
-      oled[3].println("Leed");
-      oled[4].println("Brown");    
-      oled[amp_type].println("   *");
+      oled[6].setCursor(0,15);
+      oled[6].setTextSize(5);
+      oled[6].println("Menu"); 
     }
   }
 
-  for(int i = 0; i<5; i++)
+  for(int i = 0; i<7; i++)
     oled[i].display();
 }
 
@@ -732,14 +784,15 @@ void initKatana() {
 }
 
 void init_oled() {
-  for(int i = 0; i<5; i++) {
+  
+  for(int i = 0; i<7; i++) {
     // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
-    if(!oled[i].begin(SSD1306_SWITCHCAPVCC, (i<=1) ? OLED01_ADDRESS : OLED234_ADDRESS)) { 
-      Serial.print("OLED ");
-      Serial.print(i);
-      Serial.println(" allocation failed");
-      for(;;); // Don't proceed, loop forever
-    }
+    if(i<=1)
+      oled[i].begin(SSD1306_SWITCHCAPVCC, OLED01_ADDRESS);
+    else if(i<=4)
+      oled[i].begin(SSD1306_SWITCHCAPVCC, OLED234_ADDRESS);
+    else
+      oled[i].begin(SSD1306_SWITCHCAPVCC);
 
     // Clear the buffer
     oled[i].clearDisplay();
@@ -749,39 +802,44 @@ void init_oled() {
 
 void setup() {
 
-  led_off(LED_MUTE);
-  led_off(LED_MENU);
+#ifdef DEBUG
+  Serial.begin(115200);
+#endif
+
+  // I'm not letting the lib driving the reset as it causes a problem with more than 1 SPI device, so I need to set it inactive
+  pinMode(OLED_SPI_RES, OUTPUT);
+  digitalWrite(OLED_SPI_RES, HIGH);
+
+  led_off(LED_BP_0);
   led_off(LED_BP_1);
   led_off(LED_BP_2);
   led_off(LED_BP_3);
   led_off(LED_BP_4);
   led_off(LED_BP_5);
+  led_off(LED_BP_6);
 
+  pinMode(BP_0, INPUT_PULLUP);
   pinMode(BP_1, INPUT_PULLUP);
   pinMode(BP_2, INPUT_PULLUP);
   pinMode(BP_3, INPUT_PULLUP);
   pinMode(BP_4, INPUT_PULLUP);
   pinMode(BP_5, INPUT_PULLUP);
-  pinMode(BP_MENU, INPUT_PULLUP);
-  pinMode(BP_MUTE, INPUT_PULLUP);
-
+  pinMode(BP_6, INPUT_PULLUP);
+  
+  attachInterrupt(digitalPinToInterrupt(BP_0), isr_bp0, FALLING);
   attachInterrupt(digitalPinToInterrupt(BP_1), isr_bp1, FALLING);
   attachInterrupt(digitalPinToInterrupt(BP_2), isr_bp2, FALLING);
   attachInterrupt(digitalPinToInterrupt(BP_3), isr_bp3, FALLING);
   attachInterrupt(digitalPinToInterrupt(BP_4), isr_bp4, FALLING);
   attachInterrupt(digitalPinToInterrupt(BP_5), isr_bp5, FALLING);
-  attachInterrupt(digitalPinToInterrupt(BP_MENU), isr_bp_menu, FALLING);
-  attachInterrupt(digitalPinToInterrupt(BP_MUTE), isr_bp_mute, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BP_6), isr_bp6, FALLING);
 
   lcd.init();
   lcd.init();
   lcd.backlight();
 
   init_oled();
-
-#ifdef DEBUG
-  Serial.begin(115200);
-#endif
+  
   delay(1000);
   myusb.begin();
 }
@@ -857,6 +915,14 @@ void effectsOnOffEvent(uint8_t bp) {
 }
 
 void loop() {
+
+  led_off(LED_BP_0);
+  led_off(LED_BP_1);
+  led_off(LED_BP_2);
+  led_off(LED_BP_3);
+  led_off(LED_BP_4);
+  led_off(LED_BP_5);
+  led_off(LED_BP_6);
   
   if (!midi1)
     initKatana();
@@ -867,130 +933,163 @@ void loop() {
 
   } else {
 
-    for (uint8_t i = 0; i < NB_BP; i++) {
-      if (bp_event[i]) {
-        print_("BP");
-        println_(i+1);
-        bp_event[i] = 0;
-
-        if (controlMode == effectsOnOff)
-          effectsOnOffEvent(i);
-        
-        else if (controlMode == presetSelect)
-          presetSelectEvent(i);
-
-        else if (controlMode == ampTypeSelect) 
-          ampTypeSelectEvent(i);
-      }  
-    }
-
-    if (bp_mute_event) {
-      println_("BP_MUTE");
-      bp_mute_event = 0;
-      muteToggle();
-    }
-    
-    if (bp_menu_event) {
-      println_("BP_MENU");
-      bp_menu_event = 0;
-  
-      if(controlMode == effectsOnOff) {
-        controlMode = presetSelect;
-        println("controlMode : presetSelect");
-      } else if(controlMode == presetSelect) {
-        controlMode = ampTypeSelect;      
-        println("controlMode : ampTypeSelect");
-      } else if(controlMode == ampTypeSelect) {
-        controlMode = effectsOnOff;      
+    if (controlMode == menu) {
+      /*
+      if (bp_event[0]) {
+        bp_event[0] = 0;
+        controlMode = effectsOnOff;
+        refreshScreen();
         println("controlMode : effectsOnOff");
+      } else if (bp_event[1]) {
+        bp_event[1] = 0;
+        controlMode = presetSelect;      
+        refreshScreen();
+        println("controlMode : presetSelect");
+      } else if (bp_event[2]) {
+        bp_event[2] = 0;
+        controlMode = ampTypeSelect;      
+        refreshScreen();
+        println("controlMode : ampTypeSelect");
+      } */
+      for (uint8_t i = 0; i < NB_BP; i++) {
+        if (bp_event[i]) {
+          bp_event[i] = 0;
+
+          if (i == 6) {
+            if ((menuPageId+1) * 5 < MAIN_MENU_SIZE) {
+              menuPageId++;
+              refreshScreen();
+            }
+          } else if (i == 5) {
+            if (menuPageId != 0) {
+              menuPageId--;
+              refreshScreen();
+            }
+          } else {
+            if ((menuPageId-1) * 5 + i < MAIN_MENU_SIZE) {
+              controlMode = mainMenu[menuPageId * 5 + i].destination;
+              print("controlMode : ");
+              println(mainMenu[menuPageId * 5 + i].name);
+              refreshScreen();
+            }
+          }
+        }
       }
-      refreshScreen();
+      
+    } else { // controlMode != menu
+      for (uint8_t i = 0; i < NB_BP; i++) {
+        if (bp_event[i]) {
+          print_("BP");
+          println_(i+1);
+          bp_event[i] = 0;
+
+          if (i == 5) { // Mute
+            muteToggle();
+            
+          } else if (i == 6) { // Menu
+            controlMode = menu;
+            menuPageId = 0;
+            refreshScreen();
+            
+          } else {
+            if (controlMode == effectsOnOff)
+              effectsOnOffEvent(i);
+            
+            else if (controlMode == presetSelect)
+              presetSelectEvent(i);
+    
+            else if (controlMode == ampTypeSelect) 
+              ampTypeSelectEvent(i);
+          }
+        }  
+      }       
     }
   }
 
-  if(vol_mute == ON)
-    led_on(LED_MUTE);
-  else
-    led_off(LED_MUTE);
-
+  if (controlMode != menu) {
+    if(vol_mute == ON)
+      led_on(LED_BP_5);
+    else
+      led_off(LED_BP_5);
+  }
+  
   if (controlMode == effectsOnOff) {
     if (booster_en)
+      led_on(LED_BP_0);
+    else
+      led_off(LED_BP_0);
+    
+    if (mod_en)
       led_on(LED_BP_1);
     else
       led_off(LED_BP_1);
     
-    if (mod_en)
+    if (fx_en)
       led_on(LED_BP_2);
     else
       led_off(LED_BP_2);
     
-    if (fx_en)
+    if (delay_en)
       led_on(LED_BP_3);
     else
       led_off(LED_BP_3);
-    
-    if (delay_en)
+        
+    if (reverb_en)
       led_on(LED_BP_4);
     else
       led_off(LED_BP_4);
-        
-    if (reverb_en)
-      led_on(LED_BP_5);
-    else
-      led_off(LED_BP_5);
   
   } else if(controlMode == presetSelect) {
     if (preset == Pannel)
+      led_on(LED_BP_0);
+    else
+      led_off(LED_BP_0);
+    
+    if (preset == Ch1)
       led_on(LED_BP_1);
     else
       led_off(LED_BP_1);
     
-    if (preset == Ch1)
+    if (preset == Ch2)
       led_on(LED_BP_2);
     else
       led_off(LED_BP_2);
     
-    if (preset == Ch2)
+    if (preset == Ch3)
       led_on(LED_BP_3);
     else
       led_off(LED_BP_3);
-    
-    if (preset == Ch3)
+        
+    if (preset == Ch4)
       led_on(LED_BP_4);
     else
       led_off(LED_BP_4);
-        
-    if (preset == Ch4)
-      led_on(LED_BP_5);
-    else
-      led_off(LED_BP_5);
       
   } else if(controlMode == ampTypeSelect) {
     if (amp_type == Acoustic)
+      led_on(LED_BP_0);
+    else
+      led_off(LED_BP_0);
+    
+    if (amp_type == Clean)
       led_on(LED_BP_1);
     else
       led_off(LED_BP_1);
     
-    if (amp_type == Clean)
+    if (amp_type == Crunch)
       led_on(LED_BP_2);
     else
       led_off(LED_BP_2);
     
-    if (amp_type == Crunch)
+    if (amp_type == Lead)
       led_on(LED_BP_3);
     else
       led_off(LED_BP_3);
-    
-    if (amp_type == Lead)
+        
+    if (amp_type == Brown)
       led_on(LED_BP_4);
     else
       led_off(LED_BP_4);
-        
-    if (amp_type == Brown)
-      led_on(LED_BP_5);
-    else
-      led_off(LED_BP_5);
-
-  }
       
+  }  
 }

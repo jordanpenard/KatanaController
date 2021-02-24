@@ -23,26 +23,26 @@
   void println(int s, int b = DEC) { }
 #endif
 
+#define MAIN_MENU_SIZE ((int)(sizeof(mainMenu)/sizeof(mainMenu[0])))
+
 #define BP_DEBOUNCE_MS 1000
 
-#define NB_BP 5
-#define BP_1 34
-#define BP_2 35
-#define BP_3 36
-#define BP_4 37
-#define BP_5 38
+#define NB_BP 7
+#define BP_0 34
+#define BP_1 35
+#define BP_2 36
+#define BP_3 37
+#define BP_4 38
+#define BP_5 33
+#define BP_6 39
 
-#define BP_MENU 39
-#define BP_MUTE 33
-
-#define LED_BP_1 7
-#define LED_BP_2 6
-#define LED_BP_3 5
-#define LED_BP_4 4
-#define LED_BP_5 3
-
-#define LED_MENU 2
-#define LED_MUTE 8
+#define LED_BP_0 7
+#define LED_BP_1 6
+#define LED_BP_2 5
+#define LED_BP_3 4
+#define LED_BP_4 3
+#define LED_BP_5 8
+#define LED_BP_6 2
 
 #define LCD_ADDRESS 0x27
 #define LCD_WIDTH   20 // LCD display width, in char
@@ -53,6 +53,12 @@
 #define OLED_WIDTH   128 // OLED display width, in pixels
 #define OLED_HEIGHT  64  // OLED display height, in pixels
 
+#define OLED_SPI_D0_CLK 27
+#define OLED_SPI_D1_DATA 28
+#define OLED_SPI_DC 30
+#define OLED_SPI_RES 29
+#define OLED5_SPI_CS 31
+#define OLED6_SPI_CS 32
 
 const byte SYSEX_WRITE = 0x12;
 const byte SYSEX_READ = 0x11;
