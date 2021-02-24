@@ -966,7 +966,7 @@ void loop() {
               refreshScreen();
             }
           } else {
-            if ((menuPageId-1) * 5 + i < MAIN_MENU_SIZE) {
+            if (menuPageId * 5 + i < MAIN_MENU_SIZE) {
               controlMode = mainMenu[menuPageId * 5 + i].destination;
               print("controlMode : ");
               println(mainMenu[menuPageId * 5 + i].name);
