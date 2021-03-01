@@ -19,9 +19,9 @@ Home made USB foot controller for the Boss Katana MK2 50 guitar amplifier. This 
 
 ## Hardware
 - Teensy 4.1
-- 1 * 20x4 I2C LCD
+- 1 * 20x4 LCD (HD44780)
 - 7 * push buttons with led
-- 7 * 128X64 OLED LCD Display (SSD1306)
+- 7 * 128X64 OLED (SSD1306)
 
 ### Assembly drawing
 
